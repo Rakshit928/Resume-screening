@@ -1,49 +1,423 @@
-{% load static %}
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Screening RAG</title>
+    <style>
+        /* (Keep your existing CSS here) */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Resume Screening Assistant</h1>
+            <p>Upload a resume and job description for instant analysis</p>
+        </header>
+
+        <div class="card">
+            <form id="screeningForm">
+                <div class="upload-section">
+                    <div class="form-group">
+                        <label for="resume">Resume (PDF)</label>
+                        <div class="upload-box">
+                            <i>📄</i>
+                            <p>Drag & drop your resume or click to browse</p>
+                            <input type="file" id="resume" accept=".pdf" hidden>
+                        </div>
+                        <!-- Display the selected file name here -->
+                        <p id="fileName" style="color: var(--gray-700); font-size: 1rem; margin-top: 1rem;"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="jobDescription">Job Description</label>
+                        <textarea id="jobDescription" class="form-control" placeholder="Paste the job description here..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-group" style="text-align: center;">
+                    <button type="submit" class="btn btn-primary">Analyze Resume</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Analyzing resume...</p>
+        </div>
+
+        <div class="results-section">
+            <div class="card">
+                <div class="result-card">
+                    <h3>Match Score</h3>
+                    <span class="score score-high" id="matchScore">85% Match</span>
+                </div>
+
+                <div class="match-details">
+                    <div class="detail-box">
+                        <h4>Key Strengths</h4>
+                        <div class="tags" id="strengths"></div>
+                    </div>
+
+                    <div class="detail-box">
+                        <h4>Missing Skills</h4>
+                        <div class="tags" id="missingSkills"></div>
+                    </div>
+                </div>
+
+                <div class="result-card" style="margin-top: 1.5rem;">
+                    <h3>Detailed Analysis</h3>
+                    <div id="analysis"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('screeningForm');
+            const loading = document.querySelector('.loading');
+            const results = document.querySelector('.results-section');
+            const uploadBox = document.querySelector('.upload-box');
+            const fileInput = document.getElementById('resume');
+            const fileNameDisplay = document.getElementById('fileName');
+
+            // Handle drag and drop
+            uploadBox.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadBox.style.borderColor = 'var(--primary)';
+            });
+
+            uploadBox.addEventListener('dragleave', () => {
+                uploadBox.style.borderColor = 'var(--gray-200)';
+            });
+
+            uploadBox.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadBox.style.borderColor = 'var(--gray-200)';
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            });
+
+            uploadBox.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', () => {
+                updateFileName();
+            });
+
+            function updateFileName() {
+                const file = fileInput.files[0];
+                if (file) {
+                    fileNameDisplay.textContent = `Selected file: ${file.name}`;
+                }
+            }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                formData.append('resume', fileInput.files[0]);
+                formData.append('job_description', document.getElementById('jobDescription').value);
+
+                loading.classList.add('active');
+                results.style.display = 'none';
+
+                try {
+                    const response = await fetch('/evaluate/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    displayResults(data);
+                } catch (error) {
+                    console.error('Error:', error);
+                } finally {
+                    loading.classList.remove('active');
+                }
+            });
+
+            function displayResults(data) {
+                results.style.display = 'block';
+                
+                // Parse and display match score
+                const matchScore = document.getElementById('matchScore');
+                const score = extractMatchScore(data.response);
+                matchScore.textContent = `${score}% Match`;
+                setScoreClass(matchScore, score);
+
+                // Parse and display strengths and missing skills
+                const strengths = extractStrengths(data.response);
+                const missing = extractMissingSkills(data.response);
+                
+                document.getElementById('strengths').innerHTML = strengths
+                    .map(s => `<span class="tag">${s}</span>`).join('');
+                document.getElementById('missingSkills').innerHTML = missing
+                    .map(s => `<span class="tag">${s}</span>`).join('');
+
+                // Display full analysis
+                document.getElementById('analysis').innerHTML = formatAnalysis(data.response);
+            }
+
+            function extractMatchScore(response) {
+                const match = response.match(/(\d+)%/);
+                return match ? parseInt(match[1]) : 0;
+            }
+
+            function setScoreClass(element, score) {
+                element.className = 'score ' + (
+                    score >= 80 ? 'score-high' :
+                    score >= 60 ? 'score-medium' : 'score-low'
+                );
+            }
+
+            function extractStrengths(response) {
+                const strengths = response.match(/Strength:.*?(?=\n|$)/g) || [];
+                return strengths.map(s => s.replace('Strength:', '').trim());
+            }
+
+            function extractMissingSkills(response) {
+                const missing = response.match(/Missing:.*?(?=\n|$)/g) || [];
+                return missing.map(s => s.replace('Missing:', '').trim().split(','))
+                    .flat()
+                    .map(s => s.trim())
+                    .filter(s => s);
+            }
+
+            function formatAnalysis(response) {
+                return response
+                    .split('\n')
+                    .map(line => `<p>${line}</p>`)
+                    .join('');
+            }
+        });
+    </script>
+</body>
+</html> {% endcomment %}
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume Evaluation</title>
-    <link rel="stylesheet" href="{% static 'styles.css' %}">
+    <title>Resume Evaluation System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+        }
+
+        textarea, select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dce4ec;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        select {
+            background-color: white;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        #loading {
+            text-align: center;
+            display: none;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .evaluation-section {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 6px;
+        }
+
+        .strength {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+
+        .weakness {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+
+        .match-score {
+            font-size: 1.2em;
+            color: #3498db;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
 </head>
 <body>
-
     <div class="container">
-        <h1>Resume Evaluation</h1>
-
-        <!-- Fixed form action to '/submit/' -->
-        <form id="resume-form" action="/submit/" method="POST" enctype="multipart/form-data">
+        <h1>Resume Evaluation System</h1>
+        <form id="evaluationForm">
             <div class="form-group">
-                <label for="job_description">Job Description:</label>
-                <textarea name="job_description" id="job_description" placeholder="Paste the job description here..." required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="prompt_type">Prompt Type:</label>
-                <select name="prompt_type" id="prompt_type" required>
-                    <option value="evaluation">Evaluation</option>
-                    <option value="ats">ATS</option>
+                <label for="evaluationType">Evaluation Type:</label>
+                <select id="evaluationType" required>
+                    <option value="evaluation">Resume Evaluation</option>
+                    <option value="ats">ATS Scan</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="resume">Upload Resume (PDF):</label>
-                <input type="file" name="resume" id="resume" accept=".pdf" required>
+                <input type="file" id="resume" accept=".pdf" required>
             </div>
-            
-            <button type="submit" class="btn">Submit</button>
+
+            <div class="form-group">
+                <label for="jobDescription">Job Description:</label>
+                <textarea id="jobDescription" required placeholder="Paste the job description here..."></textarea>
+            </div>
+
+            <button type="submit" class="btn">Evaluate Resume</button>
         </form>
 
-        <div id="loading" class="hidden">
-            <p>Processing your request, please wait...</p>
+        <div id="loading">
             <div class="spinner"></div>
+            <p>Analyzing resume...</p>
         </div>
 
-        <div id="response"></div>
+        <div id="results" class="results"></div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        document.getElementById('evaluationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = e.target;
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            const formData = new FormData();
+            formData.append('resume', document.getElementById('resume').files[0]);
+            formData.append('job_description', document.getElementById('jobDescription').value);
+            formData.append('evaluation_type', document.getElementById('evaluationType').value);
 
+            loading.style.display = 'block';
+            results.style.display = 'none';
+
+            try {
+                const endpoint = formData.get('evaluation_type') === 'ats' ? '/ats-scan/' : '/evaluate/';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                results.innerHTML = formatResults(data.response);
+                results.style.display = 'block';
+            } catch (error) {
+                results.innerHTML = `<div class="evaluation-section" style="background: #f8d7da;">${error.message}</div>`;
+                results.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+
+        function formatResults(response) {
+            const sections = response.split('\n');
+            let html = '';
+            
+            sections.forEach(section => {
+                if (section.trim()) {
+                    if (section.toLowerCase().includes('strength')) {
+                        html += `<div class="evaluation-section strength">${section}</div>`;
+                    } else if (section.toLowerCase().includes('weakness')) {
+                        html += `<div class="evaluation-section weakness">${section}</div>`;
+                    } else if (section.toLowerCase().includes('match')) {
+                        html += `<div class="match-score">${section}</div>`;
+                    } else {
+                        html += `<div class="evaluation-section">${section}</div>`;
+                    }
+                }
+            });
+            
+            return html || '<div class="evaluation-section">No evaluation results available.</div>';
+        }
+    </script>
 </body>
 </html>

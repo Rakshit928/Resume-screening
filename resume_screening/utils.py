@@ -11,6 +11,7 @@ import pytesseract
 from chromadb import PersistentClient
 from groq import Groq
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 load_dotenv()
 client = Groq()
 chroma_client = PersistentClient(path="./chromadb_storage")
@@ -72,6 +73,29 @@ def retrieve_from_chromadb(query_text, top_k=3):
         print(f"ChromaDB retrieval error: {e}")
         return []
 
+# def get_groq_response(job_description, resume_text, prompt):
+#     try:
+#         if not store_in_chromadb(resume_text, job_description):
+#             return "Error storing documents in database."
+        
+#         retrieved_resume = " ".join(retrieve_from_chromadb(job_description))
+        
+#         messages = [
+#             {"role": "system", "content": "You are an expert resume evaluator and ATS specialist."},
+#             {"role": "user", "content": f"Job Description: {job_description}"},
+#             {"role": "assistant", "content": "Evaluating the resume against the job description..."},
+#             {"role": "user", "content": f"Resume Content: {retrieved_resume}\nPrompt: {prompt}"}
+#         ]
+        
+#         completion = client.chat.completions.create(
+#             model="llama-3.2-90b-vision-preview",
+#             messages=messages,
+#             temperature=0.7,
+#             max_tokens=1024
+#         )
+#         return completion.choices[0].message.content
+#     except Exception as e:
+#         return f"Error generating response: {e}"
 def get_groq_response(job_description, resume_text, prompt):
     try:
         if not store_in_chromadb(resume_text, job_description):
@@ -79,11 +103,28 @@ def get_groq_response(job_description, resume_text, prompt):
         
         retrieved_resume = " ".join(retrieve_from_chromadb(job_description))
         
+        formatted_prompt = f"""
+Based on the following job description and resume, provide a structured evaluation:
+
+Job Description:
+{job_description}
+
+Resume Content:
+{retrieved_resume}
+
+Please provide your analysis in the following format:
+- Start with a clear match percentage (if ATS evaluation)
+- List key strengths as "Strength: [point]"
+- List areas for improvement as "Weakness: [point]"
+- Include relevant keywords missing from resume
+- Conclude with final recommendation
+
+{prompt}
+"""
+        
         messages = [
-            {"role": "system", "content": "You are an expert resume evaluator and ATS specialist."},
-            {"role": "user", "content": f"Job Description: {job_description}"},
-            {"role": "assistant", "content": "Evaluating the resume against the job description..."},
-            {"role": "user", "content": f"Resume Content: {retrieved_resume}\nPrompt: {prompt}"}
+            {"role": "system", "content": "You are an expert resume evaluator. Provide clear, structured feedback with proper formatting."},
+            {"role": "user", "content": formatted_prompt}
         ]
         
         completion = client.chat.completions.create(
@@ -92,6 +133,7 @@ def get_groq_response(job_description, resume_text, prompt):
             temperature=0.7,
             max_tokens=1024
         )
+        
         return completion.choices[0].message.content
     except Exception as e:
         return f"Error generating response: {e}"

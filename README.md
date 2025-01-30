@@ -1,10 +1,13 @@
 # Resume-screening
-A Django based Resume-Screening project leverages a Large Language Model (LLM) to automate the process of evaluating resumes against job descriptions. The system analyzes resumes in PDF format, extracts relevant content using OCR (Optical Character Recognition), and compares it with the job description provided by the user. 
+This project implements a Django-based Resume-Screening platform that automates the process of evaluating resumes against job descriptions. By utilizing a Retrieval-Augmented Generation (RAG) system, the platform improves the accuracy of evaluating resumes by retrieving relevant information from both the resume and the job description, then generating a detailed evaluation. The system analyzes resumes in PDF format, extracts relevant content using OCR (Optical Character Recognition), and compares it to the job description provided by the user.
+
+The use of RAG ensures that the evaluation process is data-driven, leveraging external data sources, such as pre-existing job descriptions, and offering more contextually relevant insights into how a resume matches the provided job description.
+
 
 ![Resume-Screening Logo](demosnap.png)
 
 1. # Title: "Resume Evaluation"
-   - Purpose: Clearly indicates the functionality of the platform, which is to evaluate resumes.
+   - Purpose: Uses a Retrieval-Augmented Generation (RAG) model to compare resumes with job descriptions.
 
 2. # Job Description Field
    - Label: "Job Description: Paste the job description here…"

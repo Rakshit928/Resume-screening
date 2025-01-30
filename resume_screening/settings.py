@@ -129,3 +129,6 @@ load_dotenv()
 
 # Now you can access the API key like this
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+# Path for ChromaDB storage
+CHROMADB_PATH = os.path.join(BASE_DIR, "vectorstore")
